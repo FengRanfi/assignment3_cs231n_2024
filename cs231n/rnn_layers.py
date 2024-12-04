@@ -73,8 +73,15 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
-
+    h1=x.dot(Wx)
+    h2=prev_h.dot(Wh)
+    z=h1+h2+b
+    next_h=(1-np.exp(-2*z))/(1+np.exp(-2*z))
+    #      -1*(-2)*exp(-2z)   -2exp(-2z)
+    #       2exp(-2z)        -2exp(-2z)
+    #       2exp(-2z)+2exp(-4z)+2exp(-2z)-2exp(-4z)=4*exp(-2z)
+    #       4*exp(-2z)/(1+exp(-2z))^2=1-next_h^2
+    cache=(next_h,Wx,x,Wh,prev_h)
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
     #                               END OF YOUR CODE                             #
@@ -105,7 +112,13 @@ def rnn_step_backward(dnext_h, cache):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    next_h,Wx,x,Wh,prev_h=cache
+    dz=dnext_h*(1-next_h**2)
+    db=np.sum(dz,axis=0)
+    dx=dz.dot(Wx.T)
+    dWx=x.T.dot(dz)
+    dprev_h=dz.dot(Wh.T)
+    dWh=prev_h.T.dot(dz)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -139,8 +152,16 @@ def rnn_forward(x, h0, Wx, Wh, b):
     # above. You can use a for loop to help compute the forward pass.            #
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
+    N, T, D=x.shape
+    cache=[]
+    H=b.shape[0]
+    h=np.zeros((N,T,H))
+    rech=h0
+    for i in range(T):
+        xt=x[:,i,:]  #N,D
+        rech,tcache=rnn_step_forward(xt,rech,Wx,Wh,b)
+        h[:,i,:]=rech
+        cache.append(tcache)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -167,6 +188,7 @@ def rnn_backward(dh, cache):
     - dWh: Gradient of hidden-to-hidden weights, of shape (H, H)
     - db: Gradient of biases, of shape (H,)
     """
+
     dx, dh0, dWx, dWh, db = None, None, None, None, None
     ##############################################################################
     # TODO: Implement the backward pass for a vanilla RNN running an entire      #
@@ -175,7 +197,22 @@ def rnn_backward(dh, cache):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N,T,H=dh.shape
+    D=cache[0][2].shape[1]
+    dx=np.zeros((N, T, D))
+    dWx=np.zeros((D, H))
+    dWh=np.zeros((H, H))
+    db=np.zeros((H,))
+    dhrec=0
+    for i in range(T-1,-1,-1):
+        dhrec+=dh[:,i,:]
+        tdx, tdprev_h, tdWx, tdWh, tdb=rnn_step_backward(dhrec,cache[i])
+        dx[:,i,:]=tdx
+        dhrec=tdprev_h
+        dWx+=tdWx
+        dWh+=tdWh
+        db+=tdb
+    dh0=dhrec
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
