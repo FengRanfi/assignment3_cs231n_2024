@@ -13,6 +13,8 @@ class CaptioningRNN:
     of dimension W, and operates on minibatches of size N.
 
     Note that we don't use any regularization for the CaptioningRNN.
+    CaptioningRNN 使用递归神经网络从图像特征生成字幕。RNN 接收大小为 D 的输入向量，词汇大小为 V，
+    适用于长度为 T 的序列，RNN 隐藏维度为 H，使用维度为 W 的单词向量，并对大小为 N 的小批量进行操作。
     """
 
     def __init__(
@@ -83,7 +85,8 @@ class CaptioningRNN:
         Compute training-time loss for the RNN. We input image features and
         ground-truth captions for those images, and use an RNN (or LSTM) to compute
         loss and gradients on all parameters.
-
+        计算 RNN 的训练时间损失。我们为这些图像输入图像特征和真实标题，
+        并使用 RNN（或 LSTM）来计算所有参数的损失和梯度。
         Inputs:
         - features: Input image features, of shape (N, D)
         - captions: Ground-truth captions; an integer array of shape (N, T + 1) where
@@ -148,8 +151,24 @@ class CaptioningRNN:
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
-
+        h0=features.dot(W_proj)+b_proj                      # N,D D,H        N,H
+        ty2,cache1=word_embedding_forward(captions_in,W_embed)     #N,T,D
+        ty2,cache2=rnn_forward(ty2,h0,Wx, Wh, b)                    #N,T,H
+        ty2,cache3=temporal_affine_forward(ty2,W_vocab, b_vocab)    #N,T,V
+        loss,dty2=temporal_softmax_loss(ty2,captions_out,mask)
+        dty2,dW_vocab,db_vocab=temporal_affine_backward(dty2,cache3)
+        dty2,dh0, dWx, dWh, db=rnn_backward(dty2,cache2)
+        dW_embed=word_embedding_backward(dty2,cache1)
+        dW_proj=features.T.dot(dh0)  # D,N N,H
+        db_proj=dh0.sum(axis=0)     #
+        grads["W_proj"]=dW_proj
+        grads["b_proj"]=db_proj
+        grads["W_embed"]=dW_embed
+        grads["Wx"]=dWx
+        grads["Wh"]=dWh
+        grads["b"]=db
+        grads["W_vocab"]=dW_vocab
+        grads["b_vocab"]=db_vocab
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #

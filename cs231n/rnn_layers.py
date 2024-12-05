@@ -244,9 +244,8 @@ def word_embedding_forward(x, W):
     # HINT: This can be done in one line using NumPy's array indexing.           #
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
-
+    out=W[x]
+    cache=(x,W.shape[0],W.shape[1])
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
     #                               END OF YOUR CODE                             #
@@ -278,8 +277,12 @@ def word_embedding_backward(dout, cache):
     # HINT: Look up the function np.add.at                                       #
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    x,V,D=cache
 
-    pass
+    dW=np.zeros((V,D))
+    for i in range(x.shape[0]):
+        for j in range(x.shape[1]):
+            dW[x[i,j]]+=dout[i,j]
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -513,6 +516,22 @@ def temporal_softmax_loss(x, y, mask, verbose=False):
     Returns a tuple of:
     - loss: Scalar giving loss
     - dx: Gradient of loss with respect to scores x.
+    **时间版本的softmax损失，用于RNN中。**
+
+    我们假设我们在每个时间步长上对大小为V的词汇表进行预测，时间序列的长度为T，批量大小为N。输入x给出所有词汇表元素在所有时间步长的分数，
+    y给出每个时间步长的真实元素的索引。我们在每个时间步长使用交叉熵损失，将所有时间步长的损失相加并在批量中平均。
+
+    作为一个额外的复杂性，我们可能希望在某些时间步长忽略模型输出，因为不同长度的序列可能已经被合并到一个批量中并用NULL标记填充。
+    可选的mask参数告诉我们哪些元素应该对损失有贡献。
+
+    **输入：**
+    - x：输入分数，形状为(N, T, V)
+    - y：真实索引，形状为(N, T)，其中每个元素在范围内0 <= y[i, t] < V
+    - mask：布尔数组，形状为(N, T)，其中mask[i, t]指示x[i, t]的分数是否应该对损失有贡献。
+
+    **返回：**
+    - 损失：给出损失的标量
+    - dx：关于分数x的损失梯度
     """
 
     N, T, V = x.shape
