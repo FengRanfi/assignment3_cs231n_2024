@@ -1,4 +1,5 @@
 import numpy as np
+from matplotlib.colorbar import make_axes
 
 from ..rnn_layers import *
 
@@ -234,11 +235,22 @@ class CaptioningRNN:
         # you are using an LSTM, initialize the first cell state to zeros.        #
         ###########################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
-
+        h0=features.dot(W_proj)+b_proj
+        word=np.full(N,self._start) #N,1
+        wordInput=W_embed[word]     #N,D
+        th=h0
+        H=Wh.shape[0]
+        captions_raw=np.zeros((N,max_length,H))  #N,ML,H
+        for i in range(max_length):
+            th,_=rnn_step_forward(wordInput,th,Wx, Wh, b)
+            captions_raw[:,i,:]=th
+        captions_v,_=temporal_affine_forward(captions_raw, W_vocab, b_vocab)  #N,ML,V
+        captions_v=captions_v.reshape(N*max_length,-1) #N*ML,V
+        captions=np.argmax(captions_v,axis=1) # N*ML,1
+        captions=captions.reshape(N,max_length)
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
+
         return captions
