@@ -152,13 +152,19 @@ class CaptioningRNN:
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        h0=features.dot(W_proj)+b_proj                      # N,D D,H        N,H
+        h0=features.dot(W_proj)+b_proj                      # N,D D,H
         ty2,cache1=word_embedding_forward(captions_in,W_embed)     #N,T,D
-        ty2,cache2=rnn_forward(ty2,h0,Wx, Wh, b)                    #N,T,H
+        if self.cell_type == "rnn":
+            ty2,cache2=rnn_forward(ty2,h0,Wx, Wh, b)                    #N,T,H
+        else:
+            ty2,cache2=lstm_forward(ty2,h0,Wx, Wh, b)
         ty2,cache3=temporal_affine_forward(ty2,W_vocab, b_vocab)    #N,T,V
         loss,dty2=temporal_softmax_loss(ty2,captions_out,mask)
         dty2,dW_vocab,db_vocab=temporal_affine_backward(dty2,cache3)
-        dty2,dh0, dWx, dWh, db=rnn_backward(dty2,cache2)
+        if self.cell_type == "rnn":
+            dty2,dh0, dWx, dWh, db=rnn_backward(dty2,cache2)
+        else:
+            dty2, dh0, dWx, dWh, db=lstm_backward(dty2,cache2)
         dW_embed=word_embedding_backward(dty2,cache1)
         dW_proj=features.T.dot(dh0)  # D,N N,H
         db_proj=dh0.sum(axis=0)     #
@@ -239,18 +245,22 @@ class CaptioningRNN:
         word=np.full(N,self._start) #N,1
         wordInput=W_embed[word]     #N,D
         th=h0
+        tc=np.zeros_like(th)
         H=Wh.shape[0]
-        captions_raw=np.zeros((N,max_length,H))  #N,ML,H
+        captions=np.zeros((N,max_length))  #N,ML
+
         for i in range(max_length):
-            th,_=rnn_step_forward(wordInput,th,Wx, Wh, b)
-            captions_raw[:,i,:]=th
-        captions_v,_=temporal_affine_forward(captions_raw, W_vocab, b_vocab)  #N,ML,V
-        captions_v=captions_v.reshape(N*max_length,-1) #N*ML,V
-        captions=np.argmax(captions_v,axis=1) # N*ML,1
-        captions=captions.reshape(N,max_length)
+            if self.cell_type == "rnn":
+                th,_=rnn_step_forward(wordInput,th,Wx, Wh, b)
+            else:
+                th,tc,_=lstm_step_forward(wordInput,th,tc,Wx, Wh, b)
+            captions_scores=th.dot(W_vocab)+b_vocab  #N,V
+            captions_num=np.argmax(captions_scores,axis=1) #N,1
+            captions[:,i]=captions_num
+            wordInput=W_embed[captions_num]   #N,D
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
 
-        return captions
+        return captions.astype(int)

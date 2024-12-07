@@ -330,9 +330,17 @@ def lstm_step_forward(x, prev_h, prev_c, Wx, Wh, b):
     # You may want to use the numerically stable sigmoid implementation above.  #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
-
+    H=prev_h.shape[1]
+    resh=prev_h.dot(Wh)  # N,4H
+    resInput=x.dot(Wx)   # N,4H
+    resTCell=resh+resInput+b
+    i=sigmoid(resTCell[:,0:H])
+    f=sigmoid(resTCell[:,H:2*H])
+    o=sigmoid(resTCell[:,2*H:3*H])
+    g=np.tanh(resTCell[:,3*H:4*H]) #N,H
+    next_c=prev_c*f+(i*g)
+    next_h=o*np.tanh(next_c)
+    cache = (i,f,o,g,next_c,prev_c,prev_h,x,Wx,Wh,np.tanh(next_c))
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
     #                               END OF YOUR CODE                             #
@@ -365,8 +373,28 @@ def lstm_step_backward(dnext_h, dnext_c, cache):
     # the output value from the nonlinearity.                                   #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
+    N,H=dnext_h.shape
+    i,f,o,g,next_c,prev_c,prev_h,x,Wx,Wh,ntc=cache
+    dnext_c=dnext_c+dnext_h*o*(1-ntc**2)
+    do=dnext_h*ntc
+    di=dnext_c*g
+    dg=dnext_c*i
+    df=dnext_c*prev_c
+    dprev_c=dnext_c*f
+    do=do*(1-o)*o
+    di=di*(1-i)*i
+    dg=dg*(1-g**2)
+    df=df*(1-f)*f
+    dresTCell=np.zeros((N,4*H))
+    dresTCell[:,0:H]=di
+    dresTCell[:,H:2*H]=df
+    dresTCell[:,2*H:3*H]=do
+    dresTCell[:,3*H:4*H]=dg
+    db=dresTCell.sum(axis=0)
+    dWx=x.T.dot(dresTCell)   # D,4H  D,N N,4H
+    dx=dresTCell.dot(Wx.T)   # N,D   N,4H  4H,D
+    dWh=prev_h.T.dot(dresTCell) # H,4H  H,N  N,4H
+    dprev_h=dresTCell.dot(Wh.T) # N,H  N,4H 4H,H
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -404,14 +432,21 @@ def lstm_forward(x, h0, Wx, Wh, b):
     # You should use the lstm_step_forward function that you just defined.      #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
-
+    N,T,D=x.shape
+    H=h0.shape[1]
+    c0=np.zeros_like(h0)
+    h=np.zeros((N, T, H))
+    tc=c0
+    th=h0
+    cache=[]
+    for i in range(T):
+        th,tc,tcache=lstm_step_forward(x[:,i,:],th,tc,Wx,Wh,b)
+        cache.append(tcache)
+        h[:, i, :] = th
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
-
     return h, cache
 
 
@@ -428,6 +463,8 @@ def lstm_backward(dh, cache):
     - dWx: Gradient of input-to-hidden weight matrix of shape (D, 4H)
     - dWh: Gradient of hidden-to-hidden weight matrix of shape (H, 4H)
     - db: Gradient of biases, of shape (4H,)
+    cache = (i,f,o,g,next_c,prev_c,prev_h,x,Wx,Wh,np.tanh(next_c))
+    return dx, dprev_h, dprev_c, dWx, dWh, db
     """
     dx, dh0, dWx, dWh, db = None, None, None, None, None
     #############################################################################
@@ -435,9 +472,25 @@ def lstm_backward(dh, cache):
     # You should use the lstm_step_backward function that you just defined.     #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    N,T,H=dh.shape
+    D=cache[0][7].shape[1]
+    tdc=np.zeros((N, H))
+    tdh=np.zeros((N,H))
 
-    pass
-
+    dx=np.zeros((N,T,D))
+    dWx = np.zeros((D, 4*H))
+    dWh = np.zeros((H, 4*H))
+    db = np.zeros((4*H))
+    for i in range(T-1,-1,-1):
+        tdh+=dh[:,i,:]
+        tdx, tdprev_h, tdprev_c, tdWx, tdWh, tdb=lstm_step_backward(tdh,tdc,cache[i])
+        dx[:,i,:]=tdx
+        dWx+=tdWx
+        dWh+=tdWh
+        db+=tdb
+        tdh=tdprev_h
+        tdc=tdprev_c
+    dh0=tdh
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
     #                               END OF YOUR CODE                             #
