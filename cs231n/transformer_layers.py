@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from cffi.model import attach_exception_info
 from torch.nn import functional as F
 import math
 
@@ -145,6 +146,7 @@ class MultiHeadAttention(nn.Module):
           data in value according to the attention weights calculated using key
           and query.
         """
+        H=self.n_head
         N, S, E = query.shape
         N, T, E = value.shape
         # Create a placeholder, to be overwritten by your code below.
@@ -165,8 +167,22 @@ class MultiHeadAttention(nn.Module):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
-
+        query2=self.query(query)
+        key2=self.key(key)
+        value2=self.value(value)
+        EH = E // H
+        query2=query2.view(N,S,H,EH).transpose(1,2) #N,H,S,EH
+        key2=key2.view(N,T,H,EH).transpose(1,2)   #N,H,T,EH
+        value2=value2.view(N,T,H,EH).transpose(1,2) #N,H,T,EH
+        scores=torch.matmul(query2, key2.transpose(-1,-2))/(EH**0.5)  #N,H,S,T
+        if attn_mask is not None:
+            scores = scores.masked_fill(attn_mask == 0, float('-inf'))
+        softmaxScore=torch.softmax(scores, dim=-1) #N,H,S,T
+        dropScore=self.attn_drop(softmaxScore) #N,H,S,T
+        attnout=torch.matmul(dropScore, value2) #N,H,S,EH
+        attnout=attnout.transpose(1,2).contiguous() #N,S,H,EH
+        attnout=attnout.view(N,S,E)
+        output=self.proj(attnout)
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
