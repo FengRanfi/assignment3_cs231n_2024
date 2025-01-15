@@ -39,8 +39,14 @@ class PositionalEncoding(nn.Module):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
-
+        pos_code=torch.zeros(max_len,embed_dim)
+        for i in range(max_len):
+            for j in range(embed_dim):
+                if j%2==0:
+                    pos_code[i][j]=math.sin(i*10000**(-j/embed_dim))
+                else:
+                    pos_code[i][j] = math.cos(i * 10000 ** (-(j-1) / embed_dim))
+        pe=pos_code
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -70,14 +76,15 @@ class PositionalEncoding(nn.Module):
         # afterward. This should only take a few lines of code.                    #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
+        # print(x.shape)
+        # print(self.pe.shape)
+        output=x+self.pe[0:S,0:D]
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
-        return output
+        return self.dropout(output)
 
 
 class MultiHeadAttention(nn.Module):
@@ -178,7 +185,7 @@ class MultiHeadAttention(nn.Module):
         if attn_mask is not None:
             scores = scores.masked_fill(attn_mask == 0, float('-inf'))
         softmaxScore=torch.softmax(scores, dim=-1) #N,H,S,T
-        dropScore=self.attn_drop(softmaxScore) #N,H,S,T
+        dropScore=self.attn_drop(softmaxScore)  #N,H,S,T
         attnout=torch.matmul(dropScore, value2) #N,H,S,EH
         attnout=attnout.transpose(1,2).contiguous() #N,S,H,EH
         attnout=attnout.view(N,S,E)

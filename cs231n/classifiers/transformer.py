@@ -3,6 +3,7 @@ import copy
 
 import torch
 import torch.nn as nn
+from Cython.Compiler.Options import embed
 
 from ..transformer_layers import *
 
@@ -89,9 +90,12 @@ class CaptioningTransformer(nn.Module):
         #     along with the tgt_mask. Project the output to scores per token      #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
-
+        features_embed=self.visual_projection(features).unsqueeze(1)#N,D  D,W  N,W  N,1,W
+        captions_embed=self.embedding(captions) # N,T,W
+        captions_position=self.positional_encoding(captions_embed) #N,T,W
+        tgt_mask=torch.tril(torch.ones(T,T))
+        decoder_out=self.transformer(captions_position,features_embed,tgt_mask) #N,T,W
+        scores = self.output(decoder_out) #N,T,V
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
